@@ -1,51 +1,42 @@
 openapi: 3.1.0
 info:
-  title: SST & Governança Canopus API
+  title: SST & Governança Canopus API - GPT Read Only
+  version: 2.0.1-gpt
   description: |
-    API corporativa para gestão de Segurança do Trabalho e Governança Documental do Grupo Canopus.
-    
-    Esta API implementa o princípio absoluto de ZERO INVENÇÃO, garantindo que todos os dados
-    sejam extraídos literalmente dos documentos internos oficiais. Suporta investigação de acidentes,
-    checklists, relatórios mensais, PGR e procedimentos de segurança.
-    
-    **Autenticação:** JWT Bearer Token obrigatório em todos os endpoints.
-    **Auditoria:** Todos os registros incluem createdAt, updatedAt e createdBy para rastreabilidade.
-  version: 2.0.0
-  contact:
-    name: Grupo Canopus - Departamento de SST
-    email: sst@canopus.com.br
-  license:
-    name: Proprietary
-    url: https://canopus.com.br
+    API corporativa de consulta para o GPT de SST e Governança do Grupo Canopus.
+
+    Regras de uso:
+    - ZERO INVENÇÃO: apenas dados existentes nas fontes oficiais.
+    - Todos os endpoints, exceto /health, exigem autenticação.
+    - Esta versão é otimizada para consultas do GPT e não expõe operações de escrita.
+    - Campos de auditoria são somente leitura.
 
 servers:
   - url: https://api.canopus.com.br/v1
-    description: Servidor de Produção
-  - url: https://staging-api.canopus.com.br/v1
-    description: Servidor de Staging
+    description: Produção
 
 tags:
-  - name: Acidentes
-    description: Gestão de investigação e análise de acidentes de trabalho
-  - name: Checklists
-    description: Checklists de máquinas, equipamentos e procedimentos
-  - name: Relatórios
-    description: Relatórios mensais de segurança e avaliações
-  - name: PGR
-    description: Programa de Gestão de Riscos
   - name: Saúde
-    description: Endpoints de status e health check
+    description: Verificação de disponibilidade da API.
+  - name: Acidentes
+    description: Consulta de acidentes e investigações associadas.
+  - name: Checklists
+    description: Consulta de checklists operacionais e de procedimentos.
+  - name: Relatórios
+    description: Consulta de relatórios mensais de segurança.
+  - name: PGR
+    description: Consulta de Programas de Gestão de Riscos.
 
 paths:
   /health:
     get:
-      operationId: getHealth
-      tags:
-        - Saúde
+      operationId: healthCheck
+      tags: [Saúde]
       summary: Verifica se a API está online
+      description: Retorna o status atual da API, sem exigir autenticação.
       responses:
         '200':
-          description: API funcionando
+          description: API disponível
           content:
             application/json:
               schema:
@@ -53,99 +44,28 @@ paths:
 
   /acidentes:
     get:
-      operationId: listarAcidentes
-      tags:
-        - Acidentes
-      summary: Lista todos os acidentes registrados
+      operationId: listAccidents
+      tags: [Acidentes]
+      summary: Lista acidentes registrados
+      description: |
+        Retorna acidentes cadastrados com filtros opcionais por classificação,
+        área e período. Use este endpoint para buscas amplas e listagens paginadas.
       security:
         - bearerAuth: []
       parameters:
-        - name: classificacao
-          in: query
-          schema:
-            type: string
-            enum:
-              - Acidente com lesão com perda de tempo
-              - Acidente com lesão sem perda de tempo
-              - Acidente de Trajeto
-              - Acidente Impessoal
-              - Quase Acidente
-              - Acidente ambiental
-          description: Filtrar por classificação do acidente
-        - name: area
-          in: query
-          schema:
-            type: string
-          description: Filtrar por área onde ocorreu o acidente
-        - name: dataInicio
-          in: query
-          schema:
-            type: string
-            format: date
-          description: Data de início do período de busca
-        - name: dataFim
-          in: query
-          schema:
-            type: string
-            format: date
-          description: Data de fim do período de busca
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-          description: Número máximo de resultados
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-          description: Número de registros a pular
+        - $ref: '#/components/parameters/ClassificacaoQuery'
+        - $ref: '#/components/parameters/AreaQuery'
+        - $ref: '#/components/parameters/DataInicioQuery'
+        - $ref: '#/components/parameters/DataFimQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
-          description: Lista de acidentes
+          description: Lista paginada de acidentes
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Acidente'
-                  total:
-                    type: integer
-                  limit:
-                    type: integer
-                  offset:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    post:
-      operationId: registrarAcidente
-      tags:
-        - Acidentes
-      summary: Registra um novo acidente
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AcidenteInput'
-      responses:
-        '201':
-          description: Acidente registrado com sucesso
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Acidente'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/AcidenteListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -153,19 +73,16 @@ paths:
 
   /acidentes/{id}:
     get:
-      operationId: obterAcidente
-      tags:
-        - Acidentes
-      summary: Obtém detalhes de um acidente específico
+      operationId: getAccidentById
+      tags: [Acidentes]
+      summary: Obtém detalhes de um acidente
+      description: |
+        Retorna o registro completo de um acidente específico, incluindo dados
+        do acidentado e da investigação, quando houver.
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: ID do acidente
+        - $ref: '#/components/parameters/IdPath'
       responses:
         '200':
           description: Detalhes do acidente
@@ -180,172 +97,27 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-    patch:
-      operationId: atualizarAcidente
-      tags:
-        - Acidentes
-      summary: Atualiza um acidente existente
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: ID do acidente
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AcidenteUpdate'
-      responses:
-        '200':
-          description: Acidente atualizado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Acidente'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    delete:
-      operationId: removerAcidente
-      tags:
-        - Acidentes
-      summary: Remove um acidente (soft delete)
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: ID do acidente
-      responses:
-        '204':
-          description: Acidente removido com sucesso
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /acidentes/{id}/investigacao:
-    post:
-      operationId: iniciarInvestigacao
-      tags:
-        - Acidentes
-      summary: Inicia investigação formal de um acidente
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: ID do acidente
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InvestigacaoInput'
-      responses:
-        '200':
-          description: Investigação iniciada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Acidente'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
   /checklists:
     get:
-      operationId: listarChecklists
-      tags:
-        - Checklists
-      summary: Lista todos os checklists
+      operationId: listChecklists
+      tags: [Checklists]
+      summary: Lista checklists
+      description: |
+        Retorna checklists de máquinas, procedimentos de segurança e inspeção de área.
+        Use filtros para reduzir a resposta e melhorar a precisão.
       security:
         - bearerAuth: []
       parameters:
-        - name: tipo
-          in: query
-          schema:
-            type: string
-            enum:
-              - Máquinas e Equipamentos
-              - Procedimentos de Segurança
-              - Inspeção de Área
-          description: Tipo de checklist
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
+        - $ref: '#/components/parameters/TipoChecklistQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
-          description: Lista de checklists
+          description: Lista paginada de checklists
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Checklist'
-                  total:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    post:
-      operationId: criarChecklist
-      tags:
-        - Checklists
-      summary: Cria um novo checklist
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChecklistInput'
-      responses:
-        '201':
-          description: Checklist criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Checklist'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/ChecklistListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -353,76 +125,26 @@ paths:
 
   /relatorios-mensais:
     get:
-      operationId: listarRelatoriosMensais
-      tags:
-        - Relatórios
+      operationId: listMonthlyReports
+      tags: [Relatórios]
       summary: Lista relatórios mensais de segurança
+      description: |
+        Retorna relatórios mensais com indicadores consolidados de acidentes,
+        áreas afetadas e índices de frequência e severidade.
       security:
         - bearerAuth: []
       parameters:
-        - name: mes
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 12
-          description: Mês (1-12)
-        - name: ano
-          in: query
-          schema:
-            type: integer
-          description: Ano
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
+        - $ref: '#/components/parameters/MesQuery'
+        - $ref: '#/components/parameters/AnoQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
-          description: Lista de relatórios
+          description: Lista paginada de relatórios mensais
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RelatorioMensal'
-                  total:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    post:
-      operationId: criarRelatorioMensal
-      tags:
-        - Relatórios
-      summary: Cria um novo relatório mensal
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RelatorioMensalInput'
-      responses:
-        '201':
-          description: Relatório criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RelatorioMensal'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/RelatorioMensalListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -430,69 +152,25 @@ paths:
 
   /pgr:
     get:
-      operationId: listarPGR
-      tags:
-        - PGR
+      operationId: listRiskPrograms
+      tags: [PGR]
       summary: Lista Programas de Gestão de Riscos
+      description: |
+        Retorna registros de PGR com riscos identificados, planos de ação,
+        datas e responsáveis.
       security:
         - bearerAuth: []
       parameters:
-        - name: area
-          in: query
-          schema:
-            type: string
-          description: Filtrar por área
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
+        - $ref: '#/components/parameters/AreaQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
-          description: Lista de PGRs
+          description: Lista paginada de PGRs
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PGR'
-                  total:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-    post:
-      operationId: criarPGR
-      tags:
-        - PGR
-      summary: Cria um novo PGR
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PGRInput'
-      responses:
-        '201':
-          description: PGR criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PGR'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/PGRListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -504,11 +182,118 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT Bearer Token para autenticação
+      description: Token JWT Bearer obrigatório.
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      description: ID único do recurso.
+      schema:
+        type: string
+        format: uuid
+
+    ClassificacaoQuery:
+      name: classificacao
+      in: query
+      required: false
+      description: Filtra por classificação do acidente.
+      schema:
+        type: string
+        enum:
+          - Acidente com lesão com perda de tempo
+          - Acidente com lesão sem perda de tempo
+          - Acidente de Trajeto
+          - Acidente Impessoal
+          - Quase Acidente
+          - Acidente ambiental
+
+    AreaQuery:
+      name: area
+      in: query
+      required: false
+      description: Filtra por área.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+
+    DataInicioQuery:
+      name: dataInicio
+      in: query
+      required: false
+      description: Data inicial do período no formato YYYY-MM-DD.
+      schema:
+        type: string
+        format: date
+
+    DataFimQuery:
+      name: dataFim
+      in: query
+      required: false
+      description: Data final do período no formato YYYY-MM-DD.
+      schema:
+        type: string
+        format: date
+
+    TipoChecklistQuery:
+      name: tipo
+      in: query
+      required: false
+      description: Filtra por tipo de checklist.
+      schema:
+        type: string
+        enum:
+          - Máquinas e Equipamentos
+          - Procedimentos de Segurança
+          - Inspeção de Área
+
+    MesQuery:
+      name: mes
+      in: query
+      required: false
+      description: Mês de referência entre 1 e 12.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 12
+
+    AnoQuery:
+      name: ano
+      in: query
+      required: false
+      description: Ano de referência.
+      schema:
+        type: integer
+        minimum: 2000
+        maximum: 2100
+
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Quantidade máxima de itens retornados.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+
+    OffsetQuery:
+      name: offset
+      in: query
+      required: false
+      description: Número de itens a pular para paginação.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
 
   schemas:
     HealthStatus:
       type: object
+      additionalProperties: false
       properties:
         status:
           type: string
@@ -518,18 +303,22 @@ components:
           format: date-time
         version:
           type: string
+      required:
+        - status
+        - timestamp
+        - version
 
     Acidente:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
-          description: ID único do acidente
+          readOnly: true
         dataOcorrencia:
           type: string
           format: date
-          description: Data da ocorrência
         classificacao:
           type: string
           enum:
@@ -539,25 +328,18 @@ components:
             - Acidente Impessoal
             - Quase Acidente
             - Acidente ambiental
-          description: Classificação do acidente conforme documento interno
         area:
           type: string
-          description: Área onde ocorreu o acidente
         descricaoOcorrencia:
           type: string
-          description: Descrição detalhada e literal da ocorrência
         agenteGerador:
           type: string
-          description: Agente gerador do acidente
         equipamentosEnvolvidos:
           type: string
-          description: Equipamentos envolvidos no acidente
         causasImediatas:
           type: string
-          description: Causas imediatas identificadas
         causasBasicas:
           type: string
-          description: Causas básicas/raiz do acidente
         acidentado:
           $ref: '#/components/schemas/Acidentado'
         investigacao:
@@ -565,15 +347,16 @@ components:
         createdAt:
           type: string
           format: date-time
-          description: Data de criação do registro
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
-          description: Data da última atualização
+          readOnly: true
         createdBy:
           type: string
-          description: ID do usuário que criou o registro
+          readOnly: true
       required:
+        - id
         - dataOcorrencia
         - classificacao
         - area
@@ -582,72 +365,14 @@ components:
         - updatedAt
         - createdBy
 
-    AcidenteInput:
-      type: object
-      properties:
-        dataOcorrencia:
-          type: string
-          format: date
-        classificacao:
-          type: string
-          enum:
-            - Acidente com lesão com perda de tempo
-            - Acidente com lesão sem perda de tempo
-            - Acidente de Trajeto
-            - Acidente Impessoal
-            - Quase Acidente
-            - Acidente ambiental
-        area:
-          type: string
-        descricaoOcorrencia:
-          type: string
-        agenteGerador:
-          type: string
-        equipamentosEnvolvidos:
-          type: string
-        causasImediatas:
-          type: string
-        causasBasicas:
-          type: string
-        acidentado:
-          $ref: '#/components/schemas/AcidentadoInput'
-      required:
-        - dataOcorrencia
-        - classificacao
-        - area
-        - descricaoOcorrencia
-
-    AcidenteUpdate:
-      type: object
-      properties:
-        classificacao:
-          type: string
-          enum:
-            - Acidente com lesão com perda de tempo
-            - Acidente com lesão sem perda de tempo
-            - Acidente de Trajeto
-            - Acidente Impessoal
-            - Quase Acidente
-            - Acidente ambiental
-        area:
-          type: string
-        descricaoOcorrencia:
-          type: string
-        agenteGerador:
-          type: string
-        equipamentosEnvolvidos:
-          type: string
-        causasImediatas:
-          type: string
-        causasBasicas:
-          type: string
-
     Acidentado:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         nome:
           type: string
         matricula:
@@ -663,42 +388,18 @@ components:
           type: array
           items:
             type: string
-          description: Descrição das lesões sofridas
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-        - nome
-        - matricula
-
-    AcidentadoInput:
-      type: object
-      properties:
-        nome:
-          type: string
-        matricula:
-          type: string
-        departamento:
-          type: string
-        funcao:
-          type: string
-        lesoes:
-          type: array
-          items:
-            type: string
       required:
         - nome
         - matricula
 
     Investigacao:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         dataInicio:
           type: string
           format: date-time
@@ -707,7 +408,6 @@ components:
           format: date-time
         investigador:
           type: string
-          description: Nome do investigador
         status:
           type: string
           enum:
@@ -716,39 +416,19 @@ components:
             - Suspensa
         achados:
           type: string
-          description: Achados da investigação
         recomendacoes:
           type: array
           items:
             type: string
-          description: Recomendações de ações corretivas
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    InvestigacaoInput:
-      type: object
-      properties:
-        investigador:
-          type: string
-        achados:
-          type: string
-        recomendacoes:
-          type: array
-          items:
-            type: string
-      required:
-        - investigador
 
     Checklist:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         tipo:
           type: string
           enum:
@@ -771,46 +451,28 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
+          readOnly: true
         createdBy:
           type: string
+          readOnly: true
       required:
-        - tipo
-        - titulo
-        - itens
-
-    ChecklistInput:
-      type: object
-      properties:
-        tipo:
-          type: string
-          enum:
-            - Máquinas e Equipamentos
-            - Procedimentos de Segurança
-            - Inspeção de Área
-        titulo:
-          type: string
-        descricao:
-          type: string
-        itens:
-          type: array
-          items:
-            $ref: '#/components/schemas/ItemChecklistInput'
-        responsavel:
-          type: string
-      required:
+        - id
         - tipo
         - titulo
         - itens
 
     ItemChecklist:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         descricao:
           type: string
         conforme:
@@ -820,32 +482,26 @@ components:
         dataVerificacao:
           type: string
           format: date
-
-    ItemChecklistInput:
-      type: object
-      properties:
-        descricao:
-          type: string
-        conforme:
-          type: boolean
-        observacoes:
-          type: string
       required:
         - descricao
         - conforme
 
     RelatorioMensal:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         mes:
           type: integer
           minimum: 1
           maximum: 12
         ano:
           type: integer
+          minimum: 2000
+          maximum: 2100
         totalAcidentes:
           type: integer
         acidentesComLesao:
@@ -860,67 +516,35 @@ components:
             type: string
         indiceFrequencia:
           type: number
-          format: float
-          description: Taxa de frequência de acidentes
         indiceSeveridade:
           type: number
-          format: float
-          description: Taxa de severidade
         observacoes:
           type: string
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
+          readOnly: true
         createdBy:
           type: string
+          readOnly: true
       required:
-        - mes
-        - ano
-        - totalAcidentes
-
-    RelatorioMensalInput:
-      type: object
-      properties:
-        mes:
-          type: integer
-          minimum: 1
-          maximum: 12
-        ano:
-          type: integer
-        totalAcidentes:
-          type: integer
-        acidentesComLesao:
-          type: integer
-        acidentesSemLesao:
-          type: integer
-        quaseAcidentes:
-          type: integer
-        areasAfetadas:
-          type: array
-          items:
-            type: string
-        indiceFrequencia:
-          type: number
-          format: float
-        indiceSeveridade:
-          type: number
-          format: float
-        observacoes:
-          type: string
-      required:
+        - id
         - mes
         - ano
         - totalAcidentes
 
     PGR:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         area:
           type: string
         descricao:
@@ -944,61 +568,27 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
+          readOnly: true
         createdBy:
           type: string
+          readOnly: true
       required:
-        - area
-        - riscos
-
-    PGRInput:
-      type: object
-      properties:
-        area:
-          type: string
-        descricao:
-          type: string
-        riscos:
-          type: array
-          items:
-            $ref: '#/components/schemas/RiscoInput'
-        planosAcao:
-          type: array
-          items:
-            $ref: '#/components/schemas/PlanoAcaoInput'
-        responsavel:
-          type: string
-      required:
+        - id
         - area
         - riscos
 
     Risco:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
-        descricao:
-          type: string
-        nivelRisco:
-          type: string
-          enum:
-            - Baixo
-            - Médio
-            - Alto
-            - Crítico
-        populacaoExposta:
-          type: string
-        medidasExistentes:
-          type: string
-        medidasPropostas:
-          type: string
-
-    RiscoInput:
-      type: object
-      properties:
+          readOnly: true
         descricao:
           type: string
         nivelRisco:
@@ -1020,10 +610,12 @@ components:
 
     PlanoAcao:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
+          readOnly: true
         descricao:
           type: string
         responsavel:
@@ -1048,68 +640,116 @@ components:
             - Média
             - Alta
             - Crítica
-
-    PlanoAcaoInput:
-      type: object
-      properties:
-        descricao:
-          type: string
-        responsavel:
-          type: string
-        dataInicio:
-          type: string
-          format: date
-        dataFim:
-          type: string
-          format: date
-        prioridade:
-          type: string
-          enum:
-            - Baixa
-            - Média
-            - Alta
-            - Crítica
       required:
         - descricao
         - responsavel
 
+    AcidenteListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Acidente'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - data
+        - total
+        - limit
+        - offset
+
+    ChecklistListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Checklist'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - data
+        - total
+        - limit
+        - offset
+
+    RelatorioMensalListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelatorioMensal'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - data
+        - total
+        - limit
+        - offset
+
+    PGRListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PGR'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - data
+        - total
+        - limit
+        - offset
+
     Error:
       type: object
+      additionalProperties: false
       properties:
         code:
           type: string
-          description: Código de erro único
         message:
           type: string
-          description: Mensagem de erro legível
         details:
           type: array
           items:
             type: object
+            additionalProperties: false
             properties:
               field:
                 type: string
               message:
                 type: string
-          description: Detalhes adicionais do erro
+            required:
+              - field
+              - message
       required:
         - code
         - message
 
   responses:
-    BadRequest:
-      description: Requisição inválida
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            code: BAD_REQUEST
-            message: Os dados fornecidos são inválidos
-            details:
-              - field: dataOcorrencia
-                message: Data é obrigatória
-
     Unauthorized:
       description: Não autenticado ou token inválido
       content:
@@ -1128,7 +768,7 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             code: NOT_FOUND
-            message: Acidente não encontrado
+            message: Recurso não encontrado
 
     InternalServerError:
       description: Erro interno do servidor
